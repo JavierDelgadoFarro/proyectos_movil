@@ -1,16 +1,17 @@
 package com.example.consumoapi2;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.libapijavier.DataLibrary;
 import com.google.gson.Gson;
@@ -29,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private Button loadDataButton;
     private TextView mJsonTxtView;
     private RecyclerView mRecyclerView;
+    private ProgressBar progressBar;
     private long startTime;
 
     @Override
@@ -36,35 +38,35 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Inicializar vistas y configurar el RecyclerView
         inputDataEditText = findViewById(R.id.inputData);
         loadDataButton = findViewById(R.id.btnLoadData);
         mJsonTxtView = findViewById(R.id.jsonText);
         mRecyclerView = findViewById(R.id.recyclerView);
+        progressBar = findViewById(R.id.progressBar);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         startTime = System.currentTimeMillis();
 
-        // Configurar el evento de clic del botón para cargar datos
         loadDataButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String fullUrl = inputDataEditText.getText().toString();
+                // Mostrar ProgressBar al hacer clic en el botón
+                progressBar.setVisibility(View.VISIBLE);
                 cargarDatos(fullUrl);
             }
         });
 
-        // Cargar datos con una URL vacía al inicio
         cargarDatos("");
     }
 
-    // Método para cargar datos desde la API
     private void cargarDatos(String fullUrl) {
         String baseUrl = obtenerBaseUrl(fullUrl);
         String endpoint = obtenerEndpoint(fullUrl);
 
-        // Construir Retrofit y realizar la llamada a la API
         Retrofit retrofit = construirRetrofit(baseUrl);
         if (retrofit == null) {
+            // Ocultar ProgressBar si hay un error
+            progressBar.setVisibility(View.GONE);
             return;
         }
 
@@ -73,33 +75,35 @@ public class MainActivity extends AppCompatActivity {
         realizarLlamadaApi(call);
     }
 
-    // Método para obtener la URL base de la API
     private String obtenerBaseUrl(String fullUrl) {
         if (fullUrl.trim().isEmpty()) {
             mostrarMensajeEmergente("Ingrese una URL válida");
+            // Ocultar ProgressBar si hay un error
+            progressBar.setVisibility(View.GONE);
             return "";
         }
 
         int endpointIndex = fullUrl.indexOf("get/");
         if (endpointIndex != -1) {
-            return fullUrl.substring(0, endpointIndex + 4); // Incluyendo "get/"
+            return fullUrl.substring(0, endpointIndex + 4);
         } else {
             mostrarMensajeEmergente("URL no válida. Debe contener 'get/' en la parte de la API.");
+            // Ocultar ProgressBar si hay un error
+            progressBar.setVisibility(View.GONE);
             return "";
         }
     }
 
-    // Método para obtener el endpoint de la API
+
     private String obtenerEndpoint(String fullUrl) {
         int endpointIndex = fullUrl.indexOf("get/");
         if (endpointIndex != -1) {
-            return fullUrl.substring(endpointIndex + 4); // Excluyendo "get/"
+            return fullUrl.substring(endpointIndex + 4);
         } else {
             return "";
         }
     }
 
-    // Método para construir un objeto Retrofit
     private Retrofit construirRetrofit(String baseUrl) {
         if (baseUrl.isEmpty()) {
             return null;
@@ -113,50 +117,84 @@ public class MainActivity extends AppCompatActivity {
                 .build();
     }
 
-    // Método para realizar la llamada a la API y gestionar la respuesta
     private void realizarLlamadaApi(Call<List<Object>> call) {
         call.enqueue(new Callback<List<Object>>() {
             @Override
             public void onResponse(Call<List<Object>> call, Response<List<Object>> response) {
+                Log.d("API Response", "Response code: " + response.code());
+
                 if (response.isSuccessful()) {
                     procesarRespuestaExitosa(response.body());
                 } else {
                     mostrarMensajeEmergente("Error en la respuesta: " + response.code());
                 }
+
                 calcularTiempoCarga();
             }
 
             @Override
             public void onFailure(Call<List<Object>> call, Throwable t) {
+                Log.e("API Error", "Error al cargar los datos", t);
                 mostrarMensajeEmergente("Error al cargar los datos: " + t.getMessage());
             }
         });
     }
+    /*private void procesarRespuestaExitosa(List<?> dataList) {
+        assert dataList != null;
 
-    // Método para procesar la respuesta exitosa de la API
+        // Obtén los primeros 56 registros (o menos si la lista es más corta)
+        List<?> primerosRegistros = dataList.subList(0, Math.min(dataList.size(), 56));
+
+        // Convertir la lista a una cadena JSON
+        String jsonData = new Gson().toJson(primerosRegistros);
+
+        // Mostrar la cadena JSON en el TextView
+        mJsonTxtView.setText(jsonData);
+
+        // Configurar el adaptador del RecyclerView con los primeros registros
+        DataAdapter adapter = new DataAdapter(this, primerosRegistros);
+        mRecyclerView.setAdapter(adapter);
+
+        // Mostrar un mensaje si se encontró la data y el número de registros
+        mostrarMensajeEmergente("Se encontró la data. Número de registros: " + primerosRegistros.size());
+
+        // Mostrar los datos usando la biblioteca
+        DataLibrary.showData(this, jsonData, "Información obtenida de la API");
+
+        calcularTiempoCarga();
+    }*/
+
     private void procesarRespuestaExitosa(List<?> dataList) {
         assert dataList != null;
 
-        // Limitar la lista a 25 elementos y mostrar utilizando la librería DataLibrary
-        List<?> truncatedList = dataList.subList(0, Math.min(dataList.size(), 25));
-        DataLibrary.showData(MainActivity.this, truncatedList.toString(), "Datos de la API");
-        // Convertir la lista truncada a una cadena JSON
-        String jsonData = new Gson().toJson(truncatedList);
-        // Convierte la lista completa a formato JSON
-        //String jsonData = new Gson().toJson(dataList);
+        // Obtén todos los registros
+
+        // Convertir la lista a una cadena JSON
+        String jsonData = new Gson().toJson(dataList);
+
         // Mostrar la cadena JSON en el TextView
         mJsonTxtView.setText(jsonData);
+
+        // Configurar el adaptador del RecyclerView con todos los registros
+        DataAdapter adapter = new DataAdapter(this, dataList);
+        mRecyclerView.setAdapter(adapter);
+
+        // Mostrar un mensaje si se encontró la data y el número de registros
+        mostrarMensajeEmergente("Se encontró la data. Número de registros: " + dataList.size());
+
+        // Mostrar los datos usando la biblioteca
+        DataLibrary.showData(this, jsonData, "Información obtenida de la API");
+
         calcularTiempoCarga();
     }
 
-    // Método para calcular y mostrar el tiempo de carga de datos
+
     private void calcularTiempoCarga() {
         long endTime = System.currentTimeMillis();
         double elapsedTimeSeconds = (double) (endTime - startTime) / 1000.0;
         mostrarMensajeEmergente("Data cargada en " + elapsedTimeSeconds + " segundos");
     }
 
-    // Método para mostrar un mensaje emergente (Toast)
     private void mostrarMensajeEmergente(String mensaje) {
         Toast.makeText(getApplicationContext(), mensaje, Toast.LENGTH_SHORT).show();
     }

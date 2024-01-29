@@ -1,4 +1,5 @@
 package com.example.libapijavier;
+
 import android.content.Context;
 import android.content.Intent;
 
@@ -10,5 +11,4 @@ public class DataLibrary {
         intent.putExtra("dataList", new DataWrapper<>(dataList, title));
         context.startActivity(intent);
     }
-
 }
